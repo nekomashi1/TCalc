@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>TCalc</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#8FC152">
+<link rel="icon" href="icon-192.png">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;overscroll-behavior:none}
+body{font-family:"Roboto","Noto Sans JP",system-ui,sans-serif;height:100dvh;background:var(--appBg,#ECF1DC);touch-action:manipulation;-webkit-user-select:none;user-select:none}
+.hidden{display:none!important}
+button{font-family:inherit}
+
+/* ===== 電卓画面 ===== */
+#calcScreen{height:100dvh;display:flex;flex-direction:column;background:var(--appBg)}
+#titleBar{flex:0 0 auto;display:flex;align-items:center;background:var(--tbBg);color:var(--tbFg);padding:6px 4px 6px 14px;min-height:46px}
+#titleBar .tname{font-size:20px;font-weight:500;flex:1}
+#titleBar button{background:none;border:none;color:var(--tbFg);font-size:22px;padding:6px 12px;cursor:pointer;line-height:1}
+#menuPop{position:absolute;top:48px;right:8px;background:#fff;color:#222;border-radius:6px;box-shadow:0 3px 14px rgba(0,0,0,.35);z-index:30;min-width:130px;overflow:hidden}
+#menuPop div{padding:13px 20px;font-size:15px}
+#menuPop div:active{background:#e5e5e5}
+#calcBody{flex:1;display:flex;flex-direction:column;padding:9px;padding-bottom:calc(9px + env(safe-area-inset-bottom));gap:8px;min-height:0}
+#display{flex:0 0 auto;position:relative;background:var(--dispBg);color:var(--dispFg);border:1.5px solid var(--dispBd);border-radius:var(--dispRad);padding:8px 12px 6px;min-height:74px;display:flex;flex-direction:column;justify-content:flex-end}
+#taxLabel{position:absolute;left:11px;bottom:6px;font-size:14px}
+#mainVal{display:block;text-align:right;font-size:46px;line-height:1.15;font-weight:400;white-space:nowrap;overflow:hidden}
+#mrRow{flex:0 0 auto;display:flex;gap:12px}
+.mrBox{flex:1;min-width:0}
+.mrBox label{display:block;font-size:10px;letter-spacing:.35em;color:var(--dispFg);opacity:.85;margin:0 0 2px 2px}
+.mrVal{background:var(--dispBg);color:var(--dispFg);border:1.5px solid var(--dispBd);border-radius:calc(var(--dispRad) * .6);padding:4px 10px;text-align:right;font-size:17px;white-space:nowrap;overflow:hidden}
+#keyGrid{flex:1;display:grid;gap:var(--gap);min-height:0}
+.key{position:relative;border:none;border-radius:var(--keyRad);font-size:var(--kf);color:#fff;display:flex;align-items:center;justify-content:center;padding:0;min-width:0;min-height:0;cursor:pointer;line-height:1}
+.key.bordered{border:1px solid rgba(0,0,0,.38)}
+.key:active{filter:brightness(1.22)}
+.key.k-num{background:linear-gradient(var(--numT),var(--numB));color:var(--numF)}
+.key.k-calc{background:linear-gradient(var(--calcT),var(--calcB));color:var(--calcF)}
+.key.k-clr{background:linear-gradient(var(--clrT),var(--clrB));color:var(--clrF)}
+.key.k-tax{background:linear-gradient(var(--taxT),var(--taxB));color:var(--taxF)}
+.key.k-blank{visibility:hidden;pointer-events:none}
+.key.small-lb{font-size:calc(var(--kf) * .82)}
+
+/* ===== 設定画面 ===== */
+#settingsScreen{height:100dvh;display:flex;flex-direction:column;background:#ececec;color:#1c1c1c}
+#setHeader{flex:0 0 auto;display:flex;align-items:center;background:#191919;color:#fff;padding:6px 4px 6px 14px;min-height:46px}
+#setHeader .tname{font-size:20px;font-weight:500;flex:1}
+#setHeader button{background:none;border:none;color:#fff;font-size:24px;padding:6px 14px;cursor:pointer;line-height:1}
+#tabBar{flex:0 0 auto;display:flex;background:#ececec;border-bottom:1px solid #d8d8d8}
+.tab{flex:1;text-align:center;padding:14px 2px 11px;font-size:16px;color:#555;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.tab.active{color:#111;border-bottom-color:#555;font-weight:500}
+#setBody{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.pane{padding:0 0 40px}
+
+/* 色タブ */
+.colorRow{display:flex;align-items:center;gap:16px;padding:15px 16px;border-bottom:1px solid #d9d9d9;font-size:16px;cursor:pointer}
+.swatch{width:34px;height:34px;border-radius:3px;border:1px solid #bbb;flex:0 0 auto}
+
+/* レイアウトタブ */
+.layPane{padding:10px 8px 40px}
+.layTitle{font-size:15px;margin:2px 0 6px 4px}
+.sideLbl{text-align:center;color:#e8a000;font-size:14px;margin:8px 0}
+.layGrid{display:grid;gap:6px 8px}
+.laySel{width:100%;font-size:16px;padding:9px 4px;border:none;border-bottom:1px solid #bbb;background:transparent;color:#222;border-radius:0}
+
+/* その他タブ */
+.otherPane{padding:6px 14px 50px;font-size:16px}
+.rateRow{display:flex;align-items:center;gap:6px;padding:12px 2px}
+.rateRow input{width:58px;font-size:18px;text-align:center;border:none;border-bottom:1.5px solid #999;background:transparent;padding:4px 0}
+.selRow{display:flex;align-items:center;gap:14px;padding:14px 2px}
+.selRow select{font-size:16px;padding:6px 4px;border:none;border-bottom:1px solid #aaa;background:transparent}
+.chkRow{display:flex;align-items:center;gap:12px;padding:14px 2px;cursor:pointer}
+.chkRow input{width:20px;height:20px;flex:0 0 auto}
+
+/* 情報タブ */
+.infoPane{padding:22px 18px;font-size:15px;line-height:1.9}
+.infoPane h2{font-size:20px;margin:0 0 4px}
+#btnReset{margin-top:26px;font-size:15px;padding:11px 18px;border:1px solid #b33;color:#b33;background:#fff;border-radius:6px}
+
+/* カラーピッカー */
+#pickerWrap{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+#picker{background:#fff;border-radius:10px;padding:18px;width:100%;max-width:340px}
+#pkTitle{font-size:15px;margin-bottom:10px;color:#333}
+#pkPrev{height:52px;border-radius:6px;border:1px solid #ccc;margin-bottom:14px}
+.pkRow{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.pkRow label{width:20px;font-size:14px;color:#555}
+.pkRow input[type=range]{flex:1;height:26px}
+#pkHexRow{display:flex;align-items:center;gap:10px;margin:4px 0 14px}
+#pkHex{flex:1;font-size:16px;padding:7px 8px;border:1px solid #bbb;border-radius:5px;font-family:monospace}
+#pkBtns{display:flex;gap:10px;justify-content:flex-end}
+#pkBtns button{font-size:15px;padding:9px 20px;border-radius:6px;border:1px solid #999;background:#f4f4f4}
+#pkBtns .pri{background:#3a7d2c;color:#fff;border-color:#3a7d2c}
+</style>
+</head>
+<body>
+
+<div id="calcScreen">
+  <div id="titleBar">
+    <span class="tname">TCalc</span>
+    <button id="btnWrench" aria-label="設定">&#128295;</button>
+    <button id="btnMenu" aria-label="メニュー">&#8942;</button>
+  </div>
+  <div id="menuPop" class="hidden">
+    <div data-go="set">設定</div>
+    <div data-go="info">情報</div>
+  </div>
+  <div id="calcBody">
+    <div id="display">
+      <span id="taxLabel">10.00%</span>
+      <span id="mainVal">0</span>
+    </div>
+    <div id="mrRow">
+      <div class="mrBox"><label>MEMORY</label><div id="memVal" class="mrVal">0</div></div>
+      <div class="mrBox"><label>RESULT</label><div id="resVal" class="mrVal">0</div></div>
+    </div>
+    <div id="keyGrid"></div>
+  </div>
+</div>
+
+<div id="settingsScreen" class="hidden">
+  <div id="setHeader">
+    <span class="tname">TCalc</span>
+    <button id="btnBack" aria-label="戻る">&#8617;</button>
+  </div>
+  <div id="tabBar">
+    <div class="tab" data-tab="color">色</div>
+    <div class="tab" data-tab="port">縦画面</div>
+    <div class="tab" data-tab="land">横画面</div>
+    <div class="tab" data-tab="other">その他</div>
+    <div class="tab" data-tab="info">情報</div>
+  </div>
+  <div id="setBody">
+    <div id="pane-color" class="pane"></div>
+    <div id="pane-port" class="pane layPane hidden">
+      <div class="layTitle">縦画面のキー配置</div>
+      <div class="sideLbl">端末上側</div>
+      <div id="gridPort" class="layGrid"></div>
+      <div class="sideLbl">端末下側</div>
+    </div>
+    <div id="pane-land" class="pane layPane hidden">
+      <div class="layTitle">横画面のキー配置</div>
+      <div class="sideLbl">端末左側</div>
+      <div id="gridLand" class="layGrid"></div>
+      <div class="sideLbl">端末右側</div>
+    </div>
+    <div id="pane-other" class="pane otherPane hidden">
+      <div class="rateRow">税率１：<input id="r1i" type="number" inputmode="numeric" min="0" max="99"> . <input id="r1f" type="number" inputmode="numeric" min="0" max="99"> %</div>
+      <div class="rateRow">税率２：<input id="r2i" type="number" inputmode="numeric" min="0" max="99"> . <input id="r2f" type="number" inputmode="numeric" min="0" max="99"> %</div>
+      <div class="selRow"><span>起動時の税率</span><select id="selStart"><option value="1">税率１</option><option value="2">税率２</option></select></div>
+      <label class="chkRow"><input type="checkbox" id="ckKeyRound"> キーの角を丸くする</label>
+      <label class="chkRow"><input type="checkbox" id="ckDispRound"> 計算結果エリアの角を丸くする</label>
+      <label class="chkRow"><input type="checkbox" id="ckBorder"> キーの枠線を描画する</label>
+      <label class="chkRow"><input type="checkbox" id="ckComma"> 桁をカンマで区切る</label>
+      <label class="chkRow"><input type="checkbox" id="ckVib"> キー操作時に振動させる</label>
+      <label class="chkRow"><input type="checkbox" id="ckP4"> 縦画面のキー配置を４列に拡張する</label>
+      <label class="chkRow"><input type="checkbox" id="ckNoGap"> キーを隙間無く配置する</label>
+      <label class="chkRow"><input type="checkbox" id="ckMR"> MEMORY／RESULTを表示する</label>
+      <label class="chkRow"><input type="checkbox" id="ckTitle"> タイトルバーを表示する</label>
+      <div class="selRow"><span>キー操作時の音量</span><select id="selSound"><option value="0">鳴らさない</option><option value="1">小</option><option value="2">中</option><option value="3">大</option></select></div>
+      <div class="selRow"><span>キーの文字サイズ</span><select id="selKeyFont"><option value="0">小</option><option value="1">通常</option><option value="2">大</option></select></div>
+      <div class="selRow"><span>計算値の文字サイズ</span><select id="selDigits"><option value="10">大：10桁</option><option value="12">通常：12桁</option><option value="14">小：14桁</option></select></div>
+      <div class="selRow"><span>画面の向き</span><select id="selOrient"><option value="portrait">縦固定</option><option value="landscape">横固定</option><option value="auto">自動</option></select></div>
+      <div class="selRow"><span>税計算の端数処理</span><select id="selTaxRound"><option value="none">丸めなし</option><option value="half">四捨五入</option><option value="floor">切り捨て</option><option value="ceil">切り上げ</option></select></div>
+    </div>
+    <div id="pane-info" class="pane infoPane hidden">
+      <h2>TCalc</h2>
+      <div>バージョン 1.0.0</div>
+      <div>税込・税抜計算に対応した、色とキー配置を自由にカスタマイズできる電卓アプリです。</div>
+      <button id="btnReset">設定をすべて既定値に戻す</button>
+    </div>
+  </div>
+</div>
+
+<div id="pickerWrap" class="hidden">
+  <div id="picker">
+    <div id="pkTitle"></div>
+    <div id="pkPrev"></div>
+    <div class="pkRow"><label>H</label><input type="range" id="pkH" min="0" max="360" step="1"></div>
+    <div class="pkRow"><label>S</label><input type="range" id="pkS" min="0" max="100" step="1"></div>
+    <div class="pkRow"><label>V</label><input type="range" id="pkV" min="0" max="100" step="1"></div>
+    <div id="pkHexRow"><span>HEX</span><input id="pkHex" maxlength="7" autocapitalize="off" autocomplete="off"></div>
+    <div id="pkBtns"><button id="pkCancel">キャンセル</button><button id="pkOk" class="pri">OK</button></div>
+  </div>
+</div>
+
+<script>
+/*__ENGINE_START__*/
+"use strict";
+/* ---- 10進厳密演算（BigInt係数＋スケール） ---- */
+function decParse(str){
+  let s=String(str).trim(); let neg=false;
+  if(s.startsWith("-")){neg=true;s=s.slice(1);}
+  if(s===""||s===".") s="0";
+  let i=s, f="";
+  const p=s.indexOf(".");
+  if(p>=0){i=s.slice(0,p)||"0"; f=s.slice(p+1);}
+  const m=BigInt(i+f)*(neg?-1n:1n);
+  return decNorm({m:m,s:f.length});
+}
+function decNorm(d){
+  let m=d.m,s=d.s;
+  while(s>0&&m%10n===0n){m/=10n;s--;}
+  return {m:m,s:s};
+}
+function decZero(){return {m:0n,s:0};}
+function decIsZero(d){return d.m===0n;}
+function decNeg(d){return {m:-d.m,s:d.s};}
+function pow10(n){return 10n**BigInt(n);}
+function decAlign(a,b){
+  const s=Math.max(a.s,b.s);
+  return [ {m:a.m*pow10(s-a.s),s:s}, {m:b.m*pow10(s-b.s),s:s} ];
+}
+function decAdd(a,b){const [x,y]=decAlign(a,b);return decNorm({m:x.m+y.m,s:x.s});}
+function decSub(a,b){const [x,y]=decAlign(a,b);return decNorm({m:x.m-y.m,s:x.s});}
+function decMul(a,b){return decNorm({m:a.m*b.m,s:a.s+b.s});}
+function halfDiv(N,D){ /* 四捨五入つき整数除算（0から遠い方へ） */
+  const sign=(N<0n)!==(D<0n)?-1n:1n;
+  const n=N<0n?-N:N, d=D<0n?-D:D;
+  let q=n/d; const r=n%d;
+  if(r*2n>=d) q+=1n;
+  return q*sign;
+}
+function decDiv(a,b,fracScale){
+  if(b.m===0n) return null;
+  const N=a.m*pow10(b.s+fracScale);
+  const D=b.m*pow10(a.s);
+  return decNorm({m:halfDiv(N,D),s:fracScale});
+}
+function decRoundScale(d,ts,mode){ /* mode: half|floor|ceil  floor=切り捨て(0方向) ceil=切り上げ(0から遠方) */
+  if(d.s<=ts) return d;
+  const k=pow10(d.s-ts);
+  const neg=d.m<0n; const n=neg?-d.m:d.m;
+  let q=n/k; const r=n%k;
+  if(mode==="half"){ if(r*2n>=k) q+=1n; }
+  else if(mode==="ceil"){ if(r>0n) q+=1n; }
+  /* floor: 何もしない（0方向切り捨て） */
+  return decNorm({m:neg?-q:q,s:ts});
+}
+function decToStr(d){
+  const neg=d.m<0n;
+  let digits=(neg?-d.m:d.m).toString();
+  if(digits.length<=d.s) digits=digits.padStart(d.s+1,"0");
+  const ip=digits.slice(0,digits.length-d.s);
+  const fp=d.s>0?digits.slice(digits.length-d.s):"";
+  return (neg?"-":"")+ip+(fp?"."+fp:"");
+}
+function decIntDigits(d){
+  const n=decNorm(d);
+  const digits=(n.m<0n?-n.m:n.m).toString();
+  return Math.max(1,digits.length-n.s);
+}
+function decFit(d,maxD){ /* 表示桁に収める。溢れたらnull */
+  let n=decNorm(d);
+  let id=decIntDigits(n);
+  if(id>maxD) return null;
+  let allow=maxD-id;
+  if(n.s>allow){
+    n=decRoundScale(n,allow,"half");
+    if(decIntDigits(n)>maxD) return null; /* 繰り上がりで溢れ */
+  }
+  return decNorm(n);
+}
+function numToDec(x){
+  if(!isFinite(x)) return null;
+  let s=x.toFixed(20);
+  return decParse(s);
+}
+function decSqrt(d,maxD){
+  if(d.m<0n) return null;
+  const v=Number(decToStr(d));
+  const r=Math.sqrt(v);
+  const dd=numToDec(r);
+  if(dd===null) return null;
+  return decFit(dd,maxD);
+}
+function groupFmt(entry,useComma){
+  if(entry==="E") return "E";
+  let s=entry, neg=false;
+  if(s.startsWith("-")){neg=true;s=s.slice(1);}
+  const p=s.indexOf(".");
+  let ip=p>=0?s.slice(0,p):s;
+  const rest=p>=0?s.slice(p):"";
+  if(useComma) ip=ip.replace(/\B(?=(\d{3})+(?!\d))/g,",");
+  return (neg?"-":"")+ip+rest;
+}
+function countDigits(entry){
+  return entry.replace(/[^0-9]/g,"").length;
+}
+
+/* ---- 電卓ステートマシン（即時実行方式） ---- */
+function createCalc(cfg){
+  /* cfg: { maxDigits():int, ratePercent():"10.00", taxRound():"none|half|floor|ceil" } */
+  const st={
+    entry:"0", entering:true,
+    acc:null, op:null,
+    lastOp:null, lastB:null,
+    mem:decZero(), ans:decZero(),
+    err:false
+  };
+  function cur(){ return decParse(st.entry); }
+  function setErr(){ st.err=true; st.entry="E"; st.entering=false; st.acc=null; st.op=null; st.lastOp=null; st.lastB=null; }
+  function show(dec){
+    const f=decFit(dec,cfg.maxDigits());
+    if(f===null){ setErr(); return null; }
+    st.entry=decToStr(f); st.entering=false;
+    return f;
+  }
+  function applyOp(a,op,b){
+    if(op==="add") return decAdd(a,b);
+    if(op==="sub") return decSub(a,b);
+    if(op==="mul") return decMul(a,b);
+    if(op==="div") return decDiv(a,b,cfg.maxDigits()+2);
+    return null;
+  }
+  function finalize(dec){ /* 結果確定（RESULT更新） */
+    if(dec===null){ setErr(); return; }
+    const f=show(dec);
+    if(f!==null){ st.ans=f; st.acc=null; st.op=null; }
+  }
+  function resolvePending(){ /* 保留中の演算を確定して現在値を返す */
+    if(st.op&&st.acc){
+      const r=applyOp(st.acc,st.op,cur());
+      if(r===null){ setErr(); return null; }
+      const f=decFit(r,cfg.maxDigits());
+      if(f===null){ setErr(); return null; }
+      st.acc=null; st.op=null;
+      return f;
+    }
+    return cur();
+  }
+  function taxFactor(){
+    const r=decParse(cfg.ratePercent());       /* 例 10.00 */
+    return decAdd(decParse("1"),{m:r.m,s:r.s+2}); /* 1 + r/100 */
+  }
+  function press(key){
+    if(st.err && key!=="c" && key!=="ca") return;
+    switch(key){
+      case "d0":case "d1":case "d2":case "d3":case "d4":
+      case "d5":case "d6":case "d7":case "d8":case "d9":{
+        const ch=key[1];
+        if(!st.entering){ st.entry="0"; st.entering=true; }
+        if(st.entry==="0") st.entry=ch;
+        else if(st.entry==="-0") st.entry="-"+ch;
+        else if(countDigits(st.entry)<cfg.maxDigits()) st.entry+=ch;
+        break;
+      }
+      case "d00":{
+        if(!st.entering){ st.entry="0"; st.entering=true; }
+        if(st.entry!=="0"&&st.entry!=="-0"){
+          for(let i=0;i<2;i++){ if(countDigits(st.entry)<cfg.maxDigits()) st.entry+="0"; }
+        }
+        break;
+      }
+      case "dot":{
+        if(!st.entering){ st.entry="0."; st.entering=true; }
+        else if(!st.entry.includes(".")) st.entry+=".";
+        break;
+      }
+      case "pm":{
+        if(st.entry!=="0"&&st.entry!=="E"){
+          st.entry=st.entry.startsWith("-")?st.entry.slice(1):"-"+st.entry;
+        }
+        break;
+      }
+      case "bs":{
+        if(st.entering){
+          st.entry=st.entry.slice(0,-1);
+          if(st.entry===""||st.entry==="-") st.entry="0";
+        }
+        break;
+      }
+      case "ce": st.entry="0"; st.entering=true; break;
+      case "c":
+        st.entry="0"; st.entering=true; st.acc=null; st.op=null;
+        st.lastOp=null; st.lastB=null; st.ans=decZero(); st.err=false;
+        break;
+      case "ca":
+        st.entry="0"; st.entering=true; st.acc=null; st.op=null;
+        st.lastOp=null; st.lastB=null; st.ans=decZero(); st.mem=decZero(); st.err=false;
+        break;
+      case "add": case "sub": case "mul": case "div":{
+        if(st.op&&st.acc&&st.entering){
+          const r=applyOp(st.acc,st.op,cur());
+          if(r===null){ setErr(); break; }
+          const f=show(r);
+          if(f===null) break;
+          st.acc=f;
+        }else{
+          st.acc=cur(); st.entering=false;
+        }
+        st.op=key;
+        break;
+      }
+      case "eq":{
+        if(st.op&&st.acc){
+          const b=cur();
+          const r=applyOp(st.acc,st.op,b);
+          st.lastOp=st.op; st.lastB=b;
+          finalize(r);
+        }else if(st.lastOp&&st.lastB){
+          finalize(applyOp(cur(),st.lastOp,st.lastB));
+        }
+        break;
+      }
+      case "pct":{
+        const b=cur();
+        if(st.op&&st.acc){
+          const a=st.acc; let r=null;
+          const ab=decMul(a,b);
+          const p={m:ab.m,s:ab.s+2}; /* a*b/100 */
+          if(st.op==="add") r=decAdd(a,p);
+          else if(st.op==="sub") r=decSub(a,p);
+          else if(st.op==="mul") r=decNorm(p);
+          else if(st.op==="div") r=decDiv(a,{m:b.m,s:b.s+2},cfg.maxDigits()+2);
+          st.lastOp=null; st.lastB=null;
+          finalize(r);
+        }else{
+          st.lastOp=null; st.lastB=null;
+          finalize(decNorm({m:b.m,s:b.s+2}));
+        }
+        break;
+      }
+      case "sqrt":{
+        const r=decSqrt(cur(),cfg.maxDigits());
+        st.lastOp=null; st.lastB=null;
+        finalize(r);
+        break;
+      }
+      case "taxin": case "taxout":{
+        const base=resolvePending();
+        if(base===null) break;
+        const fac=taxFactor();
+        let r=(key==="taxin")?decMul(base,fac):decDiv(base,fac,cfg.maxDigits()+2);
+        if(r!==null&&cfg.taxRound()!=="none") r=decRoundScale(r,0,cfg.taxRound());
+        st.lastOp=null; st.lastB=null;
+        finalize(r);
+        break;
+      }
+      case "mc": st.mem=decZero(); break;
+      case "mr": st.entry=decToStr(st.mem); st.entering=false; break;
+      case "mplus":{
+        const m=decFit(decAdd(st.mem,cur()),cfg.maxDigits());
+        if(m===null){ setErr(); break; }
+        st.mem=m; st.entering=false;
+        break;
+      }
+      case "mminus":{
+        const m=decFit(decSub(st.mem,cur()),cfg.maxDigits());
+        if(m===null){ setErr(); break; }
+        st.mem=m; st.entering=false;
+        break;
+      }
+      case "ans": st.entry=decToStr(st.ans); st.entering=false; break;
+      case "blank": break;
+    }
+  }
+  return {
+    press:press,
+    display:function(){return st.entry;},
+    memStr:function(){return decToStr(st.mem);},
+    ansStr:function(){return decToStr(st.ans);},
+    isErr:function(){return st.err;},
+    _st:st
+  };
+}
+/*__ENGINE_END__*/
+
+/* ================= UI ================= */
+(function(){
+if(typeof document==="undefined") return; /* nodeテスト時はここまで */
+
+var KEYS={
+  d0:{lb:"0",cat:"num"},d1:{lb:"1",cat:"num"},d2:{lb:"2",cat:"num"},d3:{lb:"3",cat:"num"},
+  d4:{lb:"4",cat:"num"},d5:{lb:"5",cat:"num"},d6:{lb:"6",cat:"num"},d7:{lb:"7",cat:"num"},
+  d8:{lb:"8",cat:"num"},d9:{lb:"9",cat:"num"},d00:{lb:"00",cat:"num"},dot:{lb:".",cat:"num"},
+  add:{lb:"＋",cat:"calc"},sub:{lb:"−",cat:"calc"},mul:{lb:"×",cat:"calc"},div:{lb:"÷",cat:"calc"},
+  eq:{lb:"＝",cat:"calc"},pct:{lb:"%",cat:"calc"},sqrt:{lb:"√",cat:"calc"},pm:{lb:"+/-",cat:"calc"},
+  ans:{lb:"Ans",cat:"calc"},mc:{lb:"MC",cat:"calc"},mr:{lb:"MR",cat:"calc"},
+  mminus:{lb:"M−",cat:"calc"},mplus:{lb:"M+",cat:"calc"},
+  ce:{lb:"CE",cat:"clr"},c:{lb:"C",cat:"clr"},ca:{lb:"CA",cat:"clr"},bs:{lb:"⇒",cat:"clr"},
+  taxin:{lb:"税込",cat:"tax"},taxout:{lb:"税抜",cat:"tax"},
+  blank:{lb:"空白",cat:"blank"}
+};
+var KEY_ORDER=["ca","c","ce","bs","taxin","taxout","add","sub","mul","div","eq","pct","sqrt","pm","ans","mc","mr","mminus","mplus","d7","d8","d9","d4","d5","d6","d1","d2","d3","d0","d00","dot","blank"];
+
+var DEF={
+  colors:{
+    appBg:"#ECF1DC",tbBg:"#8FC152",tbFg:"#FFFFFF",
+    dispBg:"#D8E8C3",dispFg:"#000000",dispBd:"#808080",
+    numT:"#3A424B",numB:"#161A20",numF:"#FFFFFF",
+    calcT:"#8B9186",calcB:"#6E7569",calcF:"#FFFFFF",
+    clrT:"#D9556F",clrB:"#C2184F",clrF:"#FFFFFF",
+    taxT:"#00A08F",taxB:"#00806F",taxF:"#FFFFFF"
+  },
+  r1:"10.00",r2:"10.00",startRate:1,
+  keyRound:true,dispRound:true,border:true,comma:true,vib:true,
+  p4:false,noGap:false,showMR:true,showTitle:true,
+  sound:0,keyFont:1,digits:12,orient:"portrait",taxRound:"none",
+  layP:[
+    ["ca","taxin","taxout","blank"],
+    ["mul","div","bs","blank"],
+    ["add","sub","eq","blank"],
+    ["d7","d8","d9","blank"],
+    ["d4","d5","d6","blank"],
+    ["d1","d2","d3","blank"],
+    ["d0","d00","dot","blank"]
+  ],
+  layL:[
+    ["mc","mr","mminus","mplus"],
+    ["c","ce","bs","ca"],
+    ["pm","d1","d4","d7"],
+    ["d0","d2","d5","d8"],
+    ["dot","d3","d6","d9"],
+    ["add","sub","mul","div"],
+    ["eq","ans","sqrt","pct"]
+  ]
+};
+var COLOR_ITEMS=[
+  ["appBg","アプリケーションの背景色"],
+  ["tbBg","タイトルバーの背景色"],
+  ["tbFg","タイトルバーの文字色"],
+  ["dispBg","計算結果エリアの背景色"],
+  ["dispFg","計算結果エリアの文字色"],
+  ["dispBd","計算結果エリアの枠線色"],
+  ["numT","数字キーの背景色(上)"],
+  ["numB","数字キーの背景色(下)"],
+  ["numF","数字キーの文字色"],
+  ["calcT","計算キーの背景色(上)"],
+  ["calcB","計算キーの背景色(下)"],
+  ["calcF","計算キーの文字色"],
+  ["clrT","クリアキーの背景色(上)"],
+  ["clrB","クリアキーの背景色(下)"],
+  ["clrF","クリアキーの文字色"],
+  ["taxT","税キーの背景色(上)"],
+  ["taxB","税キーの背景色(下)"],
+  ["taxF","税キーの文字色"]
+];
+
+var SKEY="tcalc-settings-v1";
+var store={
+  _m:{},
+  get:function(k){try{return localStorage.getItem(k);}catch(e){return this._m[k]||null;}},
+  set:function(k,v){try{localStorage.setItem(k,v);}catch(e){this._m[k]=v;}},
+  remove:function(k){try{localStorage.removeItem(k);}catch(e){delete this._m[k];}}
+};
+function clone(o){return JSON.parse(JSON.stringify(o));}
+function validLay(a){
+  if(!Array.isArray(a)||a.length!==7) return false;
+  for(var i=0;i<7;i++){
+    if(!Array.isArray(a[i])||a[i].length!==4) return false;
+    for(var j=0;j<4;j++){ if(!KEYS[a[i][j]]) return false; }
+  }
+  return true;
+}
+function loadSettings(){
+  var s=clone(DEF);
+  try{
+    var raw=store.get(SKEY);
+    if(raw){
+      var p=JSON.parse(raw);
+      for(var k in DEF){
+        if(k==="colors"||k==="layP"||k==="layL") continue;
+        if(p[k]!==undefined) s[k]=p[k];
+      }
+      if(p.colors){ for(var c in DEF.colors){ if(typeof p.colors[c]==="string") s.colors[c]=p.colors[c]; } }
+      if(validLay(p.layP)) s.layP=p.layP;
+      if(validLay(p.layL)) s.layL=p.layL;
+    }
+  }catch(e){}
+  return s;
+}
+var S=loadSettings();
+var curRate=(S.startRate===2)?2:1;
+function save(){ store.set(SKEY,JSON.stringify(S)); }
+
+var calc=createCalc({
+  maxDigits:function(){return S.digits;},
+  ratePercent:function(){return curRate===1?S.r1:S.r2;},
+  taxRound:function(){return S.taxRound;}
+});
+
+function $(id){return document.getElementById(id);}
+var elMain=$("mainVal"),elMem=$("memVal"),elRes=$("resVal"),elTax=$("taxLabel");
+
+/* ---- 表示 ---- */
+var MAIN_BASE={10:52,12:46,14:40};
+function autofit(el,base){
+  el.style.fontSize=base+"px";
+  var fs=base;
+  while(el.scrollWidth>el.clientWidth&&fs>13){ fs-=2; el.style.fontSize=fs+"px"; }
+}
+function render(){
+  elMain.textContent=groupFmt(calc.display(),S.comma);
+  autofit(elMain,MAIN_BASE[S.digits]||46);
+  elMem.textContent=groupFmt(calc.memStr(),S.comma);
+  elRes.textContent=groupFmt(calc.ansStr(),S.comma);
+  autofit(elMem,17); autofit(elRes,17);
+  elTax.textContent=(curRate===1?S.r1:S.r2)+"%";
+}
+
+/* ---- 効果音・振動 ---- */
+var actx=null;
+function beep(){
+  if(!S.sound) return;
+  try{
+    actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    var o=actx.createOscillator(),g=actx.createGain();
+    o.type="square"; o.frequency.value=1500;
+    var vol=[0,0.05,0.12,0.25][S.sound]||0;
+    g.gain.setValueAtTime(vol,actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+0.06);
+    o.connect(g); g.connect(actx.destination);
+    o.start(); o.stop(actx.currentTime+0.07);
+  }catch(e){}
+}
+function haptic(){ if(S.vib&&navigator.vibrate){ try{navigator.vibrate(12);}catch(e){} } }
+
+/* ---- 設定の反映 ---- */
+function applySettings(){
+  var r=document.documentElement.style;
+  for(var k in S.colors){ r.setProperty("--"+k,S.colors[k]); }
+  r.setProperty("--keyRad",S.keyRound?"12px":"0px");
+  r.setProperty("--dispRad",S.dispRound?"10px":"0px");
+  r.setProperty("--gap",S.noGap?"0px":"7px");
+  var mul=[0.82,1,1.18][S.keyFont]||1;
+  var mode=activeMode();
+  var vm=(mode==="P")?7.4:5.8;
+  r.setProperty("--kf","clamp("+Math.round(15*mul)+"px,"+(vm*mul).toFixed(2)+"vmin,"+Math.round(46*mul)+"px)");
+  $("titleBar").style.display=S.showTitle?"flex":"none";
+  $("mrRow").style.display=S.showMR?"flex":"none";
+  var meta=document.querySelector('meta[name="theme-color"]');
+  if(meta) meta.setAttribute("content",S.colors.tbBg);
+  tryLock();
+}
+function tryLock(){
+  try{
+    if(!screen.orientation) return;
+    if(S.orient==="auto"){ if(screen.orientation.unlock) screen.orientation.unlock(); }
+    else if(screen.orientation.lock){ screen.orientation.lock(S.orient).catch(function(){}); }
+  }catch(e){}
+}
+
+/* ---- キーグリッド ---- */
+function activeMode(){
+  if(S.orient==="portrait") return "P";
+  if(S.orient==="landscape") return "L";
+  return (window.innerWidth>window.innerHeight)?"L":"P";
+}
+function buildGrid(){
+  var g=$("keyGrid");
+  g.innerHTML="";
+  var mode=activeMode();
+  var cols,rows;
+  if(mode==="P"){ cols=S.p4?4:3; rows=7; }else{ cols=7; rows=4; }
+  g.style.gridTemplateColumns="repeat("+cols+",1fr)";
+  g.style.gridTemplateRows="repeat("+rows+",1fr)";
+  for(var rI=0;rI<rows;rI++){
+    for(var cI=0;cI<cols;cI++){
+      var id=(mode==="P")?S.layP[rI][cI]:S.layL[cI][3-rI];
+      var kd=KEYS[id]||KEYS.blank;
+      var b=document.createElement("button");
+      b.className="key k-"+kd.cat+(S.border&&kd.cat!=="blank"?" bordered":"")+(kd.lb.length>=2?" small-lb":"");
+      b.textContent=kd.cat==="blank"?"":kd.lb;
+      b.dataset.k=id;
+      g.appendChild(b);
+    }
+  }
+  applySettings();
+}
+$("keyGrid").addEventListener("pointerdown",function(e){
+  var b=e.target.closest(".key");
+  if(!b||b.classList.contains("k-blank")) return;
+  e.preventDefault();
+  haptic(); beep();
+  calc.press(b.dataset.k);
+  render();
+});
+$("keyGrid").addEventListener("contextmenu",function(e){e.preventDefault();});
+
+/* ---- 税率切替・長押しで設定 ---- */
+elTax.addEventListener("click",function(){
+  curRate=(curRate===1)?2:1;
+  render();
+});
+var lpTimer=null;
+$("display").addEventListener("touchstart",function(e){
+  if(e.target===elTax) return;
+  lpTimer=setTimeout(function(){openSettings("color");},650);
+});
+$("display").addEventListener("touchend",function(){clearTimeout(lpTimer);});
+$("display").addEventListener("touchmove",function(){clearTimeout(lpTimer);});
+
+/* ---- 画面遷移 ---- */
+function openSettings(tab){
+  $("menuPop").classList.add("hidden");
+  $("calcScreen").classList.add("hidden");
+  $("settingsScreen").classList.remove("hidden");
+  selectTab(tab||"color");
+}
+function closeSettings(){
+  $("settingsScreen").classList.add("hidden");
+  $("calcScreen").classList.remove("hidden");
+  buildGrid(); render();
+}
+$("btnWrench").addEventListener("click",function(){openSettings("color");});
+$("btnBack").addEventListener("click",closeSettings);
+$("btnMenu").addEventListener("click",function(e){
+  e.stopPropagation();
+  $("menuPop").classList.toggle("hidden");
+});
+document.addEventListener("click",function(e){
+  var p=$("menuPop");
+  if(!p.classList.contains("hidden")&&!p.contains(e.target)&&e.target.id!=="btnMenu") p.classList.add("hidden");
+});
+$("menuPop").addEventListener("click",function(e){
+  var go=e.target.dataset.go;
+  if(go==="set") openSettings("color");
+  if(go==="info") openSettings("info");
+});
+
+/* ---- タブ ---- */
+function selectTab(name){
+  var tabs=document.querySelectorAll(".tab");
+  for(var i=0;i<tabs.length;i++){
+    tabs[i].classList.toggle("active",tabs[i].dataset.tab===name);
+  }
+  var panes=["color","port","land","other","info"];
+  for(var j=0;j<panes.length;j++){
+    $("pane-"+panes[j]).classList.toggle("hidden",panes[j]!==name);
+  }
+}
+document.querySelectorAll(".tab").forEach(function(t){
+  t.addEventListener("click",function(){selectTab(t.dataset.tab);});
+});
+
+/* ---- 色タブ ---- */
+function buildColorPane(){
+  var pane=$("pane-color");
+  pane.innerHTML="";
+  COLOR_ITEMS.forEach(function(it){
+    var row=document.createElement("div");
+    row.className="colorRow";
+    var sw=document.createElement("div");
+    sw.className="swatch"; sw.style.background=S.colors[it[0]];
+    var lb=document.createElement("span");
+    lb.textContent=it[1];
+    row.appendChild(sw); row.appendChild(lb);
+    row.addEventListener("click",function(){openPicker(it[0],it[1],sw);});
+    pane.appendChild(row);
+  });
+}
+
+/* ---- カラーピッカー ---- */
+function h2r(h){
+  var m=/^#?([0-9a-f]{6})$/i.exec(h.trim());
+  if(!m) return null;
+  var n=parseInt(m[1],16);
+  return [(n>>16)&255,(n>>8)&255,n&255];
+}
+function r2h(r,g,b){
+  function p(x){return ("0"+Math.round(x).toString(16)).slice(-2);}
+  return ("#"+p(r)+p(g)+p(b)).toUpperCase();
+}
+function rgb2hsv(r,g,b){
+  r/=255;g/=255;b/=255;
+  var mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn,h=0;
+  if(d!==0){
+    if(mx===r) h=60*(((g-b)/d)%6);
+    else if(mx===g) h=60*((b-r)/d+2);
+    else h=60*((r-g)/d+4);
+  }
+  if(h<0) h+=360;
+  return [h,mx===0?0:d/mx*100,mx*100];
+}
+function hsv2rgb(h,s,v){
+  s/=100;v/=100;
+  var c=v*s,x=c*(1-Math.abs((h/60)%2-1)),m=v-c,r=0,g=0,b=0;
+  if(h<60){r=c;g=x;}else if(h<120){r=x;g=c;}else if(h<180){g=c;b=x;}
+  else if(h<240){g=x;b=c;}else if(h<300){r=x;b=c;}else{r=c;b=x;}
+  return [(r+m)*255,(g+m)*255,(b+m)*255];
+}
+var pkKey=null,pkSw=null;
+function pkSync(fromHex){
+  if(fromHex){
+    var rgb=h2r($("pkHex").value);
+    if(!rgb) return;
+    var hsv=rgb2hsv(rgb[0],rgb[1],rgb[2]);
+    $("pkH").value=Math.round(hsv[0]);
+    $("pkS").value=Math.round(hsv[1]);
+    $("pkV").value=Math.round(hsv[2]);
+  }else{
+    var c=hsv2rgb(+$("pkH").value,+$("pkS").value,+$("pkV").value);
+    $("pkHex").value=r2h(c[0],c[1],c[2]);
+  }
+  $("pkPrev").style.background=$("pkHex").value;
+}
+function openPicker(key,label,sw){
+  pkKey=key; pkSw=sw;
+  $("pkTitle").textContent=label;
+  $("pkHex").value=S.colors[key].toUpperCase();
+  pkSync(true);
+  $("pickerWrap").classList.remove("hidden");
+}
+["pkH","pkS","pkV"].forEach(function(id){
+  $(id).addEventListener("input",function(){pkSync(false);});
+});
+$("pkHex").addEventListener("input",function(){pkSync(true);});
+$("pkCancel").addEventListener("click",function(){$("pickerWrap").classList.add("hidden");});
+$("pkOk").addEventListener("click",function(){
+  var rgb=h2r($("pkHex").value);
+  if(rgb&&pkKey){
+    S.colors[pkKey]=r2h(rgb[0],rgb[1],rgb[2]);
+    if(pkSw) pkSw.style.background=S.colors[pkKey];
+    save(); applySettings();
+  }
+  $("pickerWrap").classList.add("hidden");
+});
+
+/* ---- レイアウトタブ ---- */
+function buildLayoutPane(gridId,lay,cols){
+  var g=$(gridId);
+  g.innerHTML="";
+  g.style.gridTemplateColumns="repeat("+cols+",1fr)";
+  for(var r=0;r<7;r++){
+    for(var c=0;c<cols;c++){
+      (function(rr,cc){
+        var sel=document.createElement("select");
+        sel.className="laySel";
+        KEY_ORDER.forEach(function(id){
+          var o=document.createElement("option");
+          o.value=id; o.textContent=KEYS[id].lb;
+          sel.appendChild(o);
+        });
+        sel.value=lay[rr][cc];
+        sel.addEventListener("change",function(){
+          lay[rr][cc]=sel.value; save();
+        });
+        g.appendChild(sel);
+      })(r,c);
+    }
+  }
+}
+function buildLayoutPanes(){
+  buildLayoutPane("gridPort",S.layP,S.p4?4:3);
+  buildLayoutPane("gridLand",S.layL,4);
+}
+
+/* ---- その他タブ ---- */
+function splitRate(r){ var p=r.split("."); return [p[0]||"10",p[1]||"00"]; }
+function joinRate(i,f){
+  var ii=Math.min(99,Math.max(0,parseInt(i,10)||0));
+  var ff=Math.min(99,Math.max(0,parseInt(f,10)||0));
+  return ii+"."+("0"+ff).slice(-2);
+}
+function bindOther(){
+  var a=splitRate(S.r1),b=splitRate(S.r2);
+  $("r1i").value=a[0]; $("r1f").value=a[1];
+  $("r2i").value=b[0]; $("r2f").value=b[1];
+  function upR(){
+    S.r1=joinRate($("r1i").value,$("r1f").value);
+    S.r2=joinRate($("r2i").value,$("r2f").value);
+    save(); render();
+  }
+  ["r1i","r1f","r2i","r2f"].forEach(function(id){$(id).addEventListener("change",upR);});
+  $("selStart").value=String(S.startRate);
+  $("selStart").addEventListener("change",function(){S.startRate=+this.value;save();});
+  function ck(id,key,after){
+    var el=$(id);
+    el.checked=S[key];
+    el.addEventListener("change",function(){
+      S[key]=el.checked; save();
+      if(after) after();
+    });
+  }
+  ck("ckKeyRound","keyRound",applySettings);
+  ck("ckDispRound","dispRound",applySettings);
+  ck("ckBorder","border",buildGrid);
+  ck("ckComma","comma",render);
+  ck("ckVib","vib");
+  ck("ckP4","p4",function(){buildLayoutPane("gridPort",S.layP,S.p4?4:3);buildGrid();});
+  ck("ckNoGap","noGap",applySettings);
+  ck("ckMR","showMR",applySettings);
+  ck("ckTitle","showTitle",applySettings);
+  function sel(id,key,cast,after){
+    var el=$(id);
+    el.value=String(S[key]);
+    el.addEventListener("change",function(){
+      S[key]=cast?cast(el.value):el.value; save();
+      if(after) after();
+    });
+  }
+  sel("selSound","sound",Number);
+  sel("selKeyFont","keyFont",Number,applySettings);
+  sel("selDigits","digits",Number,render);
+  sel("selOrient","orient",null,function(){buildGrid();render();});
+  sel("selTaxRound","taxRound");
+  $("btnReset").addEventListener("click",function(){
+    if(confirm("設定をすべて既定値に戻しますか？")){
+      store.remove(SKEY);
+      location.reload();
+    }
+  });
+}
+
+/* ---- 回転 ---- */
+var rzT=null;
+window.addEventListener("resize",function(){
+  clearTimeout(rzT);
+  rzT=setTimeout(function(){
+    if($("settingsScreen").classList.contains("hidden")){ buildGrid(); render(); }
+  },150);
+});
+
+/* ---- 初期化 ---- */
+buildColorPane();
+buildLayoutPanes();
+bindOther();
+buildGrid();
+render();
+selectTab("color");
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load",function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  });
+}
+})();
+</script>
+</body>
+</html>

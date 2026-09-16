@@ -1,5 +1,5 @@
-var CACHE = "tcalc-v3";
-var FILES = ["./", "./index.html", "./manifest.json", "./icon-144.png"];
+var CACHE = "tcalc-v5";
+var FILES = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(FILES); }).then(function(){ return self.skipWaiting(); }));
 });
